@@ -8,22 +8,22 @@ CREATE     procedure [dbo].[__sp_audit_log]
 	@inserted as xml
 as
 
--- akcije: -1 ignoriraj, 1 DELETE, 2 INSERT, 3 UPDATE (before), 4 UPDATE (after)
+-- actions: -1 ignore, 1 DELETE, 2 INSERT, 3 UPDATE (before), 4 UPDATE (after)
 declare 
-	@deleted_action as int = -1,								-- što bilježimo za podatke iz delete tablice
-	@insertd_action as int = -1;								-- što bilježimo za podatke iz inserted tablice
+	@deleted_action as int = -1,								
+	@insertd_action as int = -1;								
 
 if iif(@deleted is not null, 1, 0) = 0 and iif(@inserted is not null, 1, 0) = 1	
 begin
 	--	INSERT
 	set @deleted_action = -1
-	set @insertd_action = 2			-- (-1 ako ne želimo bilježiti nove zapisa)
+	set @insertd_action = 2			-- (-1 ignore - don't track new values)
 end
 else if iif(@deleted is not null, 1, 0) = 1 and iif(@inserted is not null, 1, 0) = 1	
 begin
 	--	UPDATE
 	set @deleted_action = 3
-	set @insertd_action = 4			-- (-1 ako ne želimo bilježiti nove vrjednosti zapisa)		
+	set @insertd_action = 4			-- (-1 ignore - don't track new values)
 end
 else if iif(@deleted is not null, 1, 0) = 1 and iif(@inserted is not null, 1, 0) = 0
 begin
@@ -33,7 +33,7 @@ begin
 end
         	 
 begin try
-	-- upiši stare vrijednosti podataka
+	-- insert old values
 	if (@deleted_action > 0)
 		insert into __audit_log( [__$transaction_id], [__$audit_datetime], [__$database_name], [__$schema_name], [__$table_name], [__$key_name], [__$key_value], [__$action], [__$row_xml], [__$host_name], [__$user_name], [__$proc_name],[__$application_name]) 
 		select 		
@@ -45,7 +45,7 @@ begin try
 		from 
 			@deleted.nodes('/row') as ref(row)	
 
-	-- upiši nove vrijednosti podataka
+	-- insert new values
 	if (@insertd_action > 0)
 		insert into __audit_log( [__$transaction_id], [__$audit_datetime], [__$database_name], [__$schema_name], [__$table_name], [__$key_name], [__$key_value], [__$action], [__$row_xml], [__$host_name], [__$user_name], [__$proc_name],[__$application_name]) 
 		select 		
@@ -58,5 +58,5 @@ begin try
 			@inserted.nodes('/row') as ref(row)
 end try   
 begin catch 
-	-- ništa
+	-- do nothing
 end catch
